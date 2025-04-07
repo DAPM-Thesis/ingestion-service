@@ -1,7 +1,10 @@
 package com.dapm2.ingestion_service.service;
 
 import com.dapm2.ingestion_service.demo.MyStreamSource;
+import com.dapm2.ingestion_service.kafka.KafkaProducerService;
+import com.dapm2.ingestion_service.preProcessingElements.streamSources.SSEStreamSource;
 import communication.message.impl.event.Event;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pipeline.processingelement.Source;
 
@@ -13,7 +16,12 @@ public class IngestionService {
 
     private ExecutorService executor = Executors.newSingleThreadExecutor();
     private volatile boolean isRunning = false;
+    @Autowired
+    private KafkaProducerService kafkaProducerService;
 
+    public IngestionService(KafkaProducerService kafkaProducerService) {
+        this.kafkaProducerService = kafkaProducerService;
+    }
     public String startIngestion() {
         if (isRunning) {
             return "Ingestion already running.";
@@ -23,7 +31,9 @@ public class IngestionService {
 
         executor.submit(() -> {
             try {
-                Source<Event> source = new MyStreamSource();
+                //Source<Event> source = new MyStreamSource();
+                Source<Event> source = new SSEStreamSource(kafkaProducerService);
+
                 source.start();
             } catch (Exception e) {
                 e.printStackTrace();

@@ -19,9 +19,10 @@ import algorithm.Algorithm;
 @RequestMapping("/ingest")
 public class IngestionController {
 
-    private Pipeline pipeline;
-    IngestionService ingestionService = new IngestionService();
-
+    private final IngestionService ingestionService;
+    public IngestionController(IngestionService ingestionService) {
+        this.ingestionService = ingestionService;
+    }
     @PostMapping("/start")
     public String startIngestion() {
         return ingestionService.startIngestion();

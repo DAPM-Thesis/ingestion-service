@@ -1,5 +1,6 @@
 package com.dapm2.ingestion_service.preProcessingElements.streamSources;
 
+import com.dapm2.ingestion_service.kafka.KafkaProducerService;
 import com.dapm2.ingestion_service.utils.FlattenOtherAttributeToJson;
 import com.dapm2.ingestion_service.utils.JXESUtil;
 import com.dapm2.ingestion_service.utils.TimestampConverterISO;
@@ -22,9 +23,11 @@ public class SSEStreamSource extends Source<Event> {
     private final BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<>();
     private final EventSource eventSource;
     private final String ingestionTopic= "ingested_data";
+    private final KafkaProducerService kafkaProducerService;
     private final ObjectMapper mapper = new ObjectMapper(); // Jackson parser
     private final String sseUrl = "https://stream.wikimedia.org/v2/stream/recentchange";
-    public SSEStreamSource() {
+    public SSEStreamSource(KafkaProducerService kafkaProducerService) {
+        this.kafkaProducerService = kafkaProducerService;
         EventHandler handler = new EventHandler() {
             public void onOpen() {}
             public void onClosed() {}
@@ -55,6 +58,7 @@ public class SSEStreamSource extends Source<Event> {
                 System.out.println("Ingested Event: " + dapmEvent);
                 String jxes = JXESUtil.toJXES(dapmEvent);
 
+                kafkaProducerService.sendJXES(ingestionTopic, jxes);
                 eventQueue.put(dapmEvent);
             }
         };
@@ -75,7 +79,7 @@ public class SSEStreamSource extends Source<Event> {
     @Override
     public void start() {
         eventSource.start();
-        super.start();
+        //super.start();
     }
 
     public void stop() {
