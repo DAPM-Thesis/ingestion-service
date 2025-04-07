@@ -4,6 +4,7 @@ import com.dapm2.ingestion_service.demo.MyEventAlgorithm;
 import com.dapm2.ingestion_service.demo.MyEventOperator;
 import com.dapm2.ingestion_service.demo.MySink;
 import com.dapm2.ingestion_service.demo.MyStreamSource;
+import com.dapm2.ingestion_service.service.IngestionService;
 import communication.message.Message;
 import communication.message.impl.event.Event;
 import org.springframework.web.bind.annotation.*;
@@ -19,14 +20,11 @@ import algorithm.Algorithm;
 public class IngestionController {
 
     private Pipeline pipeline;
+    IngestionService ingestionService = new IngestionService();
 
     @PostMapping("/start")
     public String startIngestion() {
-        if (pipeline != null) {
-            return "⚠️ Ingestion pipeline is already running!";
-        }
-        MyStreamSource source = new MyStreamSource();
-        source.start();
-        return "✅ Ingestion pipeline started successfully!";
+        return ingestionService.startIngestion();
     }
+
 }

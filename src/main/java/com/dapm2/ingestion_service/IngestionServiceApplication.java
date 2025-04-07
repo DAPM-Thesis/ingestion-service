@@ -4,8 +4,7 @@ import algorithm.Algorithm;
 import com.dapm2.ingestion_service.demo.MyEventAlgorithm;
 import com.dapm2.ingestion_service.demo.MyEventOperator;
 import com.dapm2.ingestion_service.demo.MySink;
-import com.dapm2.ingestion_service.demo.MyStreamSource;
-import com.dapm2.ingestion_service.streamSources.SSEStreamSource;
+import com.dapm2.ingestion_service.preProcessingElements.streamSources.SSEStreamSource;
 import communication.message.Message;
 import communication.message.impl.event.Event;
 import org.springframework.boot.SpringApplication;
@@ -24,8 +23,8 @@ public class IngestionServiceApplication {
 //		// Pipeline: Source<Event> -> Operator<Event, Event, String, String> -> Sink<Event>
 //
 //		// Source
-//		//Source<Event> source = new SSEStreamSource();
-//		Source<Event> source = new MyStreamSource();
+//		Source<Event> source = new SSEStreamSource();
+//		//Source<Event> source = new MyStreamSource();
 //
 //		// Event Operator
 //		Algorithm<Message, Event> algorithm = new MyEventAlgorithm();

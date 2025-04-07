@@ -1,7 +1,7 @@
 package com.dapm2.ingestion_service.demo;
 
-import com.dapm2.ingestion_service.helperClasses.FlattenOtherAttributeToJson;
-import com.dapm2.ingestion_service.helperClasses.TimestampConverterISO;
+import com.dapm2.ingestion_service.utils.FlattenOtherAttributeToJson;
+import com.dapm2.ingestion_service.utils.TimestampConverterISO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.launchdarkly.eventsource.EventHandler;
@@ -13,8 +13,6 @@ import pipeline.processingelement.Source;
 
 import java.net.URI;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -54,7 +52,6 @@ public class MyStreamSource extends Source<Event> {
                 // Create and queue the Event
                 Event dapmEvent = new Event(caseId, activity, timestamp, eventAttributes);
                 System.out.println("Ingested Event: " + dapmEvent);
-                eventQueue.put(dapmEvent);
             }
         };
 

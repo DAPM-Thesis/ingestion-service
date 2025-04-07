@@ -1,4 +1,4 @@
-package com.dapm2.ingestion_service.helperClasses;
+package com.dapm2.ingestion_service.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import communication.message.impl.event.Attribute;
@@ -17,6 +17,7 @@ public class FlattenOtherAttributeToJson {
      * @param parentKey  The prefix for nested fields
      * @param attributes The set to store generated attributes
      */
+    private static final AttributeSanitizer sanitize= new AttributeSanitizer();
     public static void flatten(JsonNode node, String parentKey, Set<Attribute<?>> attributes) {
         if (node.isObject()) {
             Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
@@ -36,7 +37,7 @@ public class FlattenOtherAttributeToJson {
         } else {
             String value = node.asText("").replaceAll("=", ":").replaceAll("\n", " ").trim();
             if (!value.isEmpty()) {
-                attributes.add(new Attribute<>(parentKey, value));
+                attributes.add(new Attribute<>(parentKey, sanitize.sanitize(value)));
             }
         }
     }

@@ -1,4 +1,4 @@
-package com.dapm2.ingestion_service.helperClasses;
+package com.dapm2.ingestion_service.utils;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;

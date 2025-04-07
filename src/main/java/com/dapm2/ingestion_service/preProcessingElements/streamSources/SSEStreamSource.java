@@ -1,14 +1,13 @@
-package com.dapm2.ingestion_service.streamSources;
+package com.dapm2.ingestion_service.preProcessingElements.streamSources;
 
-import com.dapm2.ingestion_service.helperClasses.FlattenOtherAttributeToJson;
-import com.dapm2.ingestion_service.helperClasses.JXESConverter;
-import com.dapm2.ingestion_service.helperClasses.TimestampConverterISO;
+import com.dapm2.ingestion_service.utils.FlattenOtherAttributeToJson;
+import com.dapm2.ingestion_service.utils.JXESUtil;
+import com.dapm2.ingestion_service.utils.TimestampConverterISO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.launchdarkly.eventsource.EventHandler;
 import com.launchdarkly.eventsource.EventSource;
 import com.launchdarkly.eventsource.MessageEvent;
-import communication.message.impl.Trace;
 import communication.message.impl.event.Attribute;
 import communication.message.impl.event.Event;
 import pipeline.processingelement.Source;
@@ -22,6 +21,7 @@ public class SSEStreamSource extends Source<Event> {
 
     private final BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<>();
     private final EventSource eventSource;
+    private final String ingestionTopic= "ingested_data";
     private final ObjectMapper mapper = new ObjectMapper(); // Jackson parser
     private final String sseUrl = "https://stream.wikimedia.org/v2/stream/recentchange";
     public SSEStreamSource() {
@@ -50,18 +50,12 @@ public class SSEStreamSource extends Source<Event> {
                 Set<Attribute<?>> eventAttributes = new HashSet<>();
                 FlattenOtherAttributeToJson.flatten(json, "", eventAttributes);
 
-                // Build DAPM Event
+                // Create and queue the Event
                 Event dapmEvent = new Event(caseId, activity, timestamp, eventAttributes);
+                System.out.println("Ingested Event: " + dapmEvent);
+                String jxes = JXESUtil.toJXES(dapmEvent);
 
-                // Convert to JXES string
-                Trace trace = new Trace(List.of(dapmEvent));
-                String jxesJson = JXESConverter.convertTraceToJXES(trace);
-
-                // Add JXES string as an attribute
-                eventAttributes.add(new Attribute<>("jxespayload", "string:" + jxesJson));
-
-                // Rebuild event with updated attributes
-                Event eventWithJXES = new Event(caseId, activity, timestamp, eventAttributes);
+                eventQueue.put(dapmEvent);
             }
         };
 
