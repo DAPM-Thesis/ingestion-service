@@ -1,6 +1,8 @@
 package com.dapm2.ingestion_service.preProcessingElements.streamSources;
 
+import com.dapm2.ingestion_service.entity.AttributeSetting;
 import com.dapm2.ingestion_service.kafka.KafkaProducerService;
+import com.dapm2.ingestion_service.preProcessingElements.AttributeSettings;
 import com.dapm2.ingestion_service.utils.FlattenOtherAttributeToJson;
 import com.dapm2.ingestion_service.utils.JXESUtil;
 import com.dapm2.ingestion_service.utils.TimestampConverterISO;
@@ -23,6 +25,7 @@ public class SSEStreamSource extends Source<Event> {
     private final BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<>();
     private final EventSource eventSource;
     private final String ingestionTopic= "ingested_data";
+    private final long idR= (long) 3;
     private final KafkaProducerService kafkaProducerService;
     private final ObjectMapper mapper = new ObjectMapper(); // Jackson parser
     private final String sseUrl = "https://stream.wikimedia.org/v2/stream/recentchange";
@@ -41,20 +44,10 @@ public class SSEStreamSource extends Source<Event> {
                 String data = messageEvent.getData();
                 JsonNode json = mapper.readTree(data);
 
-                // Extract main event fields
-                String caseId = json.path("meta").path("id").asText("unknown_case");
-                String activity = json.path("type").asText("unknown_type");
-                Object rawTimestamp = json.path("timestamp").isNumber()
-                        ? json.path("timestamp").longValue()
-                        : json.path("timestamp").asText();
-                String timestamp = TimestampConverterISO.toISO(rawTimestamp);
+                AttributeSettings attributeSettings = AttributeSettings.fromSettingId(idR);
 
-                // Collect all other fields as flat key=value attributes
-                Set<Attribute<?>> eventAttributes = new HashSet<>();
-                FlattenOtherAttributeToJson.flatten(json, "", eventAttributes);
+                Event dapmEvent = attributeSettings.extractEvent(json);
 
-                // Create and queue the Event
-                Event dapmEvent = new Event(caseId, activity, timestamp, eventAttributes);
                 System.out.println("Ingested Event: " + dapmEvent);
                 String jxes = JXESUtil.toJXES(dapmEvent);
 
