@@ -2,7 +2,7 @@ package com.dapm2.ingestion_service.preProcessingElements;
 
 import com.dapm2.ingestion_service.config.SpringContext;
 import com.dapm2.ingestion_service.entity.AttributeSetting;
-import com.dapm2.ingestion_service.service.ConfigurationService;
+import com.dapm2.ingestion_service.service.StreamConfigurationService;
 import com.dapm2.ingestion_service.utils.TimestampConverterISO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,14 +11,14 @@ import communication.message.impl.event.Event;
 
 import java.util.*;
 
-public class AttributeSettings {
+public class AttributeSettingProcess {
 
     private final String caseIdField;
     private final String activityField;
     private final String timestampField;
     private final List<String> attributes;
 
-    private AttributeSettings(String caseIdField, String activityField, String timestampField, List<String> attributes) {
+    private AttributeSettingProcess(String caseIdField, String activityField, String timestampField, List<String> attributes) {
         this.caseIdField = caseIdField;
         this.activityField = activityField;
         this.timestampField = timestampField;
@@ -26,8 +26,8 @@ public class AttributeSettings {
     }
 
     // Load from DB using real Spring service
-    public static AttributeSettings fromSettingId(Long id) {
-        ConfigurationService service = SpringContext.getBean(ConfigurationService.class);
+    public static AttributeSettingProcess fromSettingId(Long id) {
+        StreamConfigurationService service = SpringContext.getBean(StreamConfigurationService.class);
         ObjectMapper mapper = SpringContext.getBean(ObjectMapper.class);
 
         AttributeSetting setting = service.getAttributeSettingById(id);
@@ -42,7 +42,7 @@ public class AttributeSettings {
             System.err.println("Failed to parse attribute list: " + e.getMessage());
         }
 
-        return new AttributeSettings(
+        return new AttributeSettingProcess(
                 setting.getCaseId(),
                 setting.getActivity(),
                 setting.getTimeStamp(),

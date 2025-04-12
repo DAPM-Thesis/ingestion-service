@@ -1,24 +1,27 @@
 package com.dapm2.ingestion_service.service;
 
-import com.dapm2.ingestion_service.dto.AttributeSettingDTO;
-import com.dapm2.ingestion_service.entity.AttributeSetting;
+import com.dapm2.ingestion_service.dto.*;
+import com.dapm2.ingestion_service.entity.*;
 import com.dapm2.ingestion_service.repository.AttributeSettingRepository;
+import com.dapm2.ingestion_service.repository.FilterConfigRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
 @Service
-public class ConfigurationService {
+public class StreamConfigurationService {
 
-    private final AttributeSettingRepository repository;
-    private final ObjectMapper mapper;
+    @Autowired
+    private FilterConfigRepository filterRepository;
 
-    public ConfigurationService(AttributeSettingRepository repository, ObjectMapper mapper) {
-        this.repository = repository;
-        this.mapper = mapper;
-    }
+    @Autowired
+    private AttributeSettingRepository repository;
+
+    @Autowired
+    private ObjectMapper mapper;
 
     public AttributeSetting saveAttributes(AttributeSettingDTO dto) {
         AttributeSetting setting = new AttributeSetting();
@@ -33,10 +36,8 @@ public class ConfigurationService {
                 throw new RuntimeException("Error serializing attributes list", e);
             }
         }
-
         return repository.save(setting);
     }
-
     public AttributeSetting getAttributeSettingById(Long id) {
         return repository.findById(id)
                 .orElse(null);
@@ -63,5 +64,38 @@ public class ConfigurationService {
             return false;
         }
     }
+    public FilterConfig saveFilter(FilterConfigDTO dto) {
+        try {
+            FilterConfig config = new FilterConfig();
+            config.setFilters(mapper.writeValueAsString(dto.getFilters()));
+            return filterRepository.save(config);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to save filter config", e);
+        }
+    }
+    public FilterConfig getFilterById(Long id) {
+        return filterRepository.findById(id)
+                .orElse(null);
+    }
+    public FilterConfig updateFilter(Long id, FilterConfigDTO dto) {
+        Optional<FilterConfig> optional = filterRepository.findById(id);
+        if (optional.isEmpty()) {
+            throw new RuntimeException("Filter config not found with id: " + id);
+        }
 
+        try {
+            FilterConfig config = optional.get();
+            config.setFilters(mapper.writeValueAsString(dto.getFilters()));
+            return filterRepository.save(config);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to update filter config", e);
+        }
+    }
+    public boolean deleteFilter(Long id) {
+        if (filterRepository.existsById(id)) {
+            filterRepository.deleteById(id);
+            return true;
+        }
+        return false;
+    }
 }
