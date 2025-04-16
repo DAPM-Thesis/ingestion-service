@@ -3,6 +3,7 @@ package com.dapm2.ingestion_service.service;
 import com.dapm2.ingestion_service.demo.MyStreamSource;
 import com.dapm2.ingestion_service.kafka.KafkaProducerService;
 import com.dapm2.ingestion_service.preProcessingElements.streamSources.SSEStreamSource;
+import communication.Producer;
 import communication.message.impl.event.Event;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -31,10 +32,8 @@ public class IngestionService {
 
         executor.submit(() -> {
             try {
-                //Source<Event> source = new MyStreamSource();
-                Source<Event> source = new SSEStreamSource(kafkaProducerService);
-
-                source.start();
+                SSEStreamSource source = new SSEStreamSource(kafkaProducerService);
+                source.start();  // this will use the event source to begin ingestion
             } catch (Exception e) {
                 e.printStackTrace();
                 isRunning = false;

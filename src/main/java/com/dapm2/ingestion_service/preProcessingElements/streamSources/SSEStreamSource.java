@@ -24,7 +24,8 @@ public class SSEStreamSource extends Source<Event> {
     private final long filtering_id = (long) 1;
     private final long attribute_id = (long) 3;
     private final KafkaProducerService kafkaProducerService;
-    private final ObjectMapper mapper = new ObjectMapper(); // Jackson parser
+    //Jackson parser
+    private final ObjectMapper mapper = new ObjectMapper();
     private final String sseUrl = "https://stream.wikimedia.org/v2/stream/recentchange";
     public SSEStreamSource(KafkaProducerService kafkaProducerService) {
         this.kafkaProducerService = kafkaProducerService;
