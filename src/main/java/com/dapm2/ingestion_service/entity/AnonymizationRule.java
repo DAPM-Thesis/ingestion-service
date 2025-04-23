@@ -1,11 +1,18 @@
 package com.dapm2.ingestion_service.entity;
 
+import com.dapm2.ingestion_service.utils.AppConstants;
+import com.dapm2.ingestion_service.utils.StringListToJsonConverter;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.List;
 
 @Entity
 @Table(name = "anonymization_rules")
+@Getter
+@Setter
 public class AnonymizationRule {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -13,31 +20,14 @@ public class AnonymizationRule {
     @Column(name = "data_source_id", nullable = false, unique = true)
     private String dataSourceId;
 
-    @Column(name = "rules", columnDefinition = "TEXT")
-    private String rules; // Stored as JSON string
+    @Column(name = "pseudonymization", columnDefinition = "TEXT")
+    @Convert(converter = StringListToJsonConverter.class)
+    private List<String> pseudonymization;
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
+    @Column(name = "suppression", columnDefinition = "TEXT")
+    @Convert(converter = StringListToJsonConverter.class)
+    private List<String> suppression;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getDataSourceId() {
-        return dataSourceId;
-    }
-
-    public void setDataSourceId(String dataSourceId) {
-        this.dataSourceId = dataSourceId;
-    }
-
-    public String getRules() {
-        return rules;
-    }
-
-    public void setRules(String rules) {
-        this.rules = rules;
-    }
+    @Column(nullable = false)
+    private String status = AppConstants.STATUS_ACTIVE;
 }

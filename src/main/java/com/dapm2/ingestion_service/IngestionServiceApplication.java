@@ -15,11 +15,10 @@ import pipeline.processingelement.Sink;
 import pipeline.processingelement.Source;
 import pipeline.processingelement.operator.SimpleOperator;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "com.dapm2.ingestion_service")
 public class IngestionServiceApplication {
 
 	public static void main(String[] args) {
-
 //		// Pipeline: Source<Event> -> Operator<Event, Event, String, String> -> Sink<Event>
 //
 //		// Source

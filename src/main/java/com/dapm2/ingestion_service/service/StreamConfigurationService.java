@@ -4,6 +4,7 @@ import com.dapm2.ingestion_service.dto.*;
 import com.dapm2.ingestion_service.entity.*;
 import com.dapm2.ingestion_service.repository.AttributeSettingRepository;
 import com.dapm2.ingestion_service.repository.FilterConfigRepository;
+import com.dapm2.ingestion_service.utils.AppConstants;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,7 @@ public class StreamConfigurationService {
 
         if (dto.getAttributes() != null) {
             try {
+                setting.setStatus(dto.getStatus() != null ? dto.getStatus() : AppConstants.STATUS_ACTIVE);
                 setting.setAttributes(mapper.writeValueAsString(dto.getAttributes()));
             } catch (JsonProcessingException e) {
                 throw new RuntimeException("Error serializing attributes list", e);
@@ -50,11 +52,25 @@ public class StreamConfigurationService {
             existing.setCaseId(dto.getCaseId());
             existing.setActivity(dto.getActivity());
             existing.setTimeStamp(dto.getTimeStamp());
-            existing.setAttributes(String.join(",", dto.getAttributes())); // Convert list to comma-separated string
+            try {
+                existing.setAttributes(mapper.writeValueAsString(dto.getAttributes()));
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException("Error serializing attributes list", e);
+            }
+            if (dto.getStatus() != null) {
+                existing.setStatus(dto.getStatus());
+            }
             return repository.save(existing);
         } else {
             throw new RuntimeException("Attribute setting not found with id: " + id);
         }
+    }
+    public boolean updateAttributeStatus(Long id, String status) {
+        return repository.findById(id).map(setting -> {
+            setting.setStatus(status);
+            repository.save(setting);
+            return true;
+        }).orElse(false);
     }
     public boolean deleteAttributeSetting(Long id) {
         if (repository.existsById(id)) {
@@ -68,6 +84,7 @@ public class StreamConfigurationService {
         try {
             FilterConfig config = new FilterConfig();
             config.setFilters(mapper.writeValueAsString(dto.getFilters()));
+            config.setStatus(dto.getStatus() != null ? dto.getStatus() : AppConstants.STATUS_ACTIVE);
             return filterRepository.save(config);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to save filter config", e);
@@ -86,10 +103,20 @@ public class StreamConfigurationService {
         try {
             FilterConfig config = optional.get();
             config.setFilters(mapper.writeValueAsString(dto.getFilters()));
+            if (dto.getStatus() != null) {
+                config.setStatus(dto.getStatus());
+            }
             return filterRepository.save(config);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to update filter config", e);
         }
+    }
+    public boolean updateFilterStatus(Long id, String status) {
+        return filterRepository.findById(id).map(config -> {
+            config.setStatus(status);
+            filterRepository.save(config);
+            return true;
+        }).orElse(false);
     }
     public boolean deleteFilter(Long id) {
         if (filterRepository.existsById(id)) {

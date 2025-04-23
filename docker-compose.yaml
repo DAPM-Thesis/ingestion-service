@@ -1,7 +1,7 @@
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper-new
+    container_name: zookeeper-new-ing
     restart: always
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -11,7 +11,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:latest
-    container_name: kafka-new
+    container_name: kafka-new-ing
     restart: always
     depends_on:
       - zookeeper
@@ -28,7 +28,7 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
+    container_name: kafka-ui-ing
     restart: always
     depends_on:
       - kafka
@@ -56,4 +56,4 @@ services:
     container_name: adminer
     restart: always
     ports:
-      - "8082:8080"  # Changed host port from 8080 to 8082
+      - "8085:8080"

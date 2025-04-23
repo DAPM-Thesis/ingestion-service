@@ -1,5 +1,6 @@
 package com.dapm2.ingestion_service.entity;
 
+import com.dapm2.ingestion_service.utils.AppConstants;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,5 +16,8 @@ public class FilterConfig {
     private Long id;
 
     @Column(columnDefinition = "TEXT")
-    private String filters; // Stored as JSON string
+    private String filters;
+
+    @Column(nullable = false)
+    private String status = AppConstants.STATUS_ACTIVE;
 }

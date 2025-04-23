@@ -3,11 +3,9 @@ package com.dapm2.ingestion_service.service;
 import com.dapm2.ingestion_service.dto.AnonymizationRuleDTO;
 import com.dapm2.ingestion_service.entity.AnonymizationRule;
 import com.dapm2.ingestion_service.repository.AnonymizationRuleRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.dapm2.ingestion_service.utils.AppConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.Optional;
 
@@ -17,19 +15,17 @@ public class AnonymizationRuleService {
     @Autowired
     private AnonymizationRuleRepository repository;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
     public AnonymizationRule saveRule(AnonymizationRuleDTO request) {
-        try {
-            String jsonRules = objectMapper.writeValueAsString(request.getRules());
-            AnonymizationRule rule = new AnonymizationRule();
-            rule.setDataSourceId(request.getDataSourceId());
-            rule.setRules(jsonRules);
-            return repository.save(rule);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Error serializing rules", e);
-        }
+        AnonymizationRule rule = new AnonymizationRule();
+        rule.setDataSourceId(request.getDataSourceId());
+        rule.setPseudonymization(request.getPseudonymization());
+        rule.setSuppression(request.getSuppression());
+        rule.setStatus(
+                request.getStatus() != null
+                        ? request.getStatus()
+                        : AppConstants.STATUS_ACTIVE
+        );
+        return repository.save(rule);
     }
 
     public AnonymizationRule getRuleById(Long id) {
@@ -49,15 +45,24 @@ public class AnonymizationRuleService {
         if (optional.isEmpty()) {
             throw new RuntimeException("Anonymization rule not found with id: " + id);
         }
-
-        try {
-            AnonymizationRule rule = optional.get();
-            rule.setDataSourceId(request.getDataSourceId());
-            rule.setRules(objectMapper.writeValueAsString(request.getRules()));
-            return repository.save(rule);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to update rules", e);
+        AnonymizationRule rule = optional.get();
+        rule.setDataSourceId(request.getDataSourceId());
+        rule.setPseudonymization(request.getPseudonymization());
+        rule.setSuppression(request.getSuppression());
+        if (request.getStatus() != null) {
+            rule.setStatus(request.getStatus());
         }
+        return repository.save(rule);
+    }
+
+    public boolean updateRuleStatus(Long id, String status) {
+        return repository.findById(id)
+                .map(r -> {
+                    r.setStatus(status);
+                    repository.save(r);
+                    return true;
+                })
+                .orElse(false);
     }
 
     public boolean deleteRule(Long id) {

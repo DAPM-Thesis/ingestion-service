@@ -1,6 +1,8 @@
 package com.dapm2.ingestion_service.preProcessingElements.streamSources;
 
+import com.dapm2.ingestion_service.config.SpringContext;
 import com.dapm2.ingestion_service.kafka.KafkaProducerService;
+import com.dapm2.ingestion_service.preProcessingElements.AnonymizationProcess;
 import com.dapm2.ingestion_service.preProcessingElements.AttributeSettingProcess;
 import com.dapm2.ingestion_service.preProcessingElements.FiltrationProcess;
 import com.dapm2.ingestion_service.utils.JXESUtil;
@@ -22,7 +24,8 @@ public class SSEStreamSource extends Source<Event> {
     private final EventSource eventSource;
     private final String ingestionTopic= "ingested_data";
     private final long filtering_id = (long) 1;
-    private final long attribute_id = (long) 3;
+    private final long attribute_id = (long) 1;
+    private final String source_id = "wiki";
     private final KafkaProducerService kafkaProducerService;
     //Jackson parser
     private final ObjectMapper mapper = new ObjectMapper();
@@ -47,6 +50,8 @@ public class SSEStreamSource extends Source<Event> {
                     System.out.println("Event filtered out.");
                     return; // skip this event
                 }
+                //Anonymization is optional
+                json = AnonymizationProcess.apply(json, source_id);
                 //Attribute Setting
                 AttributeSettingProcess attributeSettingProcess = AttributeSettingProcess.fromSettingId(attribute_id);
                 //Convert to Event type

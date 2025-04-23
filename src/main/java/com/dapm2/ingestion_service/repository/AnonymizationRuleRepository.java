@@ -8,7 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface AnonymizationRuleRepository extends JpaRepository<AnonymizationRule, Long> {
-
-    // Return only the first (and only) record by dataSourceId
     Optional<AnonymizationRule> findFirstByDataSourceId(String dataSourceId);
 }

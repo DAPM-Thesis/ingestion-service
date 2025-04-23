@@ -1,9 +1,14 @@
 package com.dapm2.ingestion_service.entity;
 
+import com.dapm2.ingestion_service.utils.AppConstants;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "attribute_setting")
+@Getter
+@Setter
 public class AttributeSetting {
 
     @Id
@@ -19,47 +24,9 @@ public class AttributeSetting {
     @Column(name = "time_stamp", nullable = false)
     private String timeStamp;
 
-    @Column(columnDefinition = "TEXT") // Store as plain string
+    @Column(columnDefinition = "TEXT")
     private String attributes;
 
-    // Getters and setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getCaseId() {
-        return caseId;
-    }
-
-    public void setCaseId(String caseId) {
-        this.caseId = caseId;
-    }
-
-    public String getActivity() {
-        return activity;
-    }
-
-    public void setActivity(String activity) {
-        this.activity = activity;
-    }
-
-    public String getTimeStamp() {
-        return timeStamp;
-    }
-
-    public void setTimeStamp(String timeStamp) {
-        this.timeStamp = timeStamp;
-    }
-
-    public String getAttributes() {
-        return attributes;
-    }
-
-    public void setAttributes(String attributes) {
-        this.attributes = attributes;
-    }
+    @Column(nullable = false)
+    private String status = AppConstants.STATUS_ACTIVE;
 }
