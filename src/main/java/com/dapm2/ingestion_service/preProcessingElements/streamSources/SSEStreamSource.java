@@ -1,6 +1,5 @@
 package com.dapm2.ingestion_service.preProcessingElements.streamSources;
 
-import com.dapm2.ingestion_service.config.SpringContext;
 import com.dapm2.ingestion_service.kafka.KafkaProducerService;
 import com.dapm2.ingestion_service.preProcessingElements.AnonymizationProcess;
 import com.dapm2.ingestion_service.preProcessingElements.AttributeSettingProcess;
@@ -20,59 +19,71 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class SSEStreamSource extends Source<Event> {
 
-    private final BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<>();
-    private final EventSource eventSource;
-    private final String ingestionTopic= "ingested_data";
-    private final long filtering_id = (long) 1;
-    private final long attribute_id = (long) 1;
-    private final String source_id = "wiki";
-    private final KafkaProducerService kafkaProducerService;
-    //Jackson parser
-    private final ObjectMapper mapper = new ObjectMapper();
-    private final String sseUrl = "https://stream.wikimedia.org/v2/stream/recentchange";
-    public SSEStreamSource(KafkaProducerService kafkaProducerService) {
-        this.kafkaProducerService = kafkaProducerService;
-        EventHandler handler = new EventHandler() {
-            public void onOpen() {}
-            public void onClosed() {}
-            public void onComment(String comment) {}
+    //Hard-coded Data for ingestion that will be replaced with the payload sent through api call
+    private static final String INGESTION_TOPIC = "ingested_data";
+    private static final String SSE_URL         = "https://stream.wikimedia.org/v2/stream/recentchange";
+    private static final long   FILTERING_ID    = 1L;
+    private static final long   ATTRIBUTE_ID    = 1L;
+    private static final String SOURCE_ID       = "wiki3";
 
+    private final BlockingQueue<Event>         eventQueue;
+    private final EventSource                  eventSource;
+    private final ObjectMapper                 mapper;
+    private final FiltrationProcess            filtrationProcess;
+    private final AttributeSettingProcess      attributeProcess;
+    private final AnonymizationProcess         anonymizationProcess;
+
+    public SSEStreamSource(KafkaProducerService kafkaProducerService) {
+        this.eventQueue             = new LinkedBlockingQueue<>();
+        this.mapper                 = new ObjectMapper();
+
+        // load once at startup
+        this.filtrationProcess     = FiltrationProcess.fromFilterId(FILTERING_ID);
+        this.attributeProcess      = AttributeSettingProcess.fromSettingId(ATTRIBUTE_ID);
+        this.anonymizationProcess  = AnonymizationProcess.fromDataSourceId(SOURCE_ID);
+
+        EventHandler handler = new EventHandler() {
+            @Override public void onOpen() {}
+            @Override public void onClosed() {}
+            @Override public void onComment(String comment) {}
+
+            @Override
             public void onError(Throwable t) {
                 System.err.println("SSE Error: " + t.getMessage());
             }
 
+            @Override
             public void onMessage(String event, MessageEvent messageEvent) throws Exception {
-                String data = messageEvent.getData();
-                JsonNode json = mapper.readTree(data);
-                //Filtration Process
-                FiltrationProcess filtration = FiltrationProcess.fromFilterId(filtering_id);
-                if (!filtration.shouldPass(json)) {
-                    System.out.println("Event filtered out.");
-                    return; // skip this event
-                }
-                //Anonymization is optional
-                json = AnonymizationProcess.apply(json, source_id);
-                //Attribute Setting
-                AttributeSettingProcess attributeSettingProcess = AttributeSettingProcess.fromSettingId(attribute_id);
-                //Convert to Event type
-                Event dapmEvent = attributeSettingProcess.extractEvent(json);
-                System.out.println("Ingested Event: " + dapmEvent);
-                //Convert to JXES format
-                String jxes = JXESUtil.toJXES(dapmEvent);
+                JsonNode json = mapper.readTree(messageEvent.getData());
 
-                //Add to kafka Broker Topic
-                kafkaProducerService.sendJXES(ingestionTopic, jxes);
+                // 1) filter
+                if (!filtrationProcess.shouldPass(json)) {
+                    return;
+                }
+
+                // 2) anonymize (no DB calls here)
+                json = anonymizationProcess.apply(json);
+
+                // 3) attribute setting
+                Event dapmEvent = attributeProcess.extractEvent(json);
+
+                // 4) to JXES + Kafka
+                String jxes = JXESUtil.toJXES(dapmEvent);
+                kafkaProducerService.sendJXES(INGESTION_TOPIC, jxes);
+
+                // 5) enqueue
                 eventQueue.put(dapmEvent);
+                System.out.println("Ingested Value:"+ dapmEvent);
             }
         };
 
-        this.eventSource = new EventSource.Builder(handler, URI.create(sseUrl)).build();
+        this.eventSource = new EventSource.Builder(handler, URI.create(SSE_URL)).build();
     }
 
     @Override
     public Event process() {
         try {
-            return eventQueue.take(); // blocks until event is available
+            return eventQueue.take();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;
@@ -82,7 +93,6 @@ public class SSEStreamSource extends Source<Event> {
     @Override
     public void start() {
         eventSource.start();
-        //super.start();
     }
 
     public void stop() {

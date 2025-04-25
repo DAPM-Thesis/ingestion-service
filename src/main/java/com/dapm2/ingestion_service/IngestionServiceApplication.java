@@ -9,12 +9,17 @@ import communication.message.Message;
 import communication.message.impl.event.Event;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 import pipeline.Pipeline;
 import pipeline.PipelineBuilder;
 import pipeline.processingelement.Sink;
 import pipeline.processingelement.Source;
 import pipeline.processingelement.operator.SimpleOperator;
-
+@EntityScan(basePackages = "com.dapm2.ingestion_service.entity")
+@EnableJpaRepositories(basePackages = "com.dapm2.ingestion_service.repository")
+@EnableMongoRepositories(basePackages = "com.dapm2.ingestion_service.mongo")
 @SpringBootApplication(scanBasePackages = "com.dapm2.ingestion_service")
 public class IngestionServiceApplication {
 
