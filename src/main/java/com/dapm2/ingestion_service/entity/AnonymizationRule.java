@@ -30,4 +30,7 @@ public class AnonymizationRule {
 
     @Column(nullable = false)
     private String status = AppConstants.STATUS_ACTIVE;
+
+    @Column(name = "unique_field", nullable = false)
+    private String uniqueField;
 }

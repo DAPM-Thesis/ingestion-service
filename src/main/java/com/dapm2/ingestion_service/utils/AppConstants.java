@@ -8,4 +8,9 @@ public class AppConstants {
     //Anonymization
     public static final String SUPPRESSION = "suppression";
     public static final String PSEUDONYMIZATION = "pseudonymization";
+    public static final String Raw_Data = "rawData";
+    public static final String Anonymized_Data = "anonymizedData";
+    public static final String Mapping_Table_For_ = "mappingTableFor_";
+    public static final String Ingested_Raw_Data_For_ = "ingestedRawDataFor_";
+    public static final String MAPPING_Table_ID = "mappingTableID";
 }

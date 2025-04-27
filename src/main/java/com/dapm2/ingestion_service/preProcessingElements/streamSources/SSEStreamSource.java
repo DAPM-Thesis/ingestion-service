@@ -1,6 +1,8 @@
 package com.dapm2.ingestion_service.preProcessingElements.streamSources;
 
+import com.dapm2.ingestion_service.config.SpringContext;
 import com.dapm2.ingestion_service.kafka.KafkaProducerService;
+import com.dapm2.ingestion_service.mongo.AnonymizationMappingService;
 import com.dapm2.ingestion_service.preProcessingElements.AnonymizationProcess;
 import com.dapm2.ingestion_service.preProcessingElements.AttributeSettingProcess;
 import com.dapm2.ingestion_service.preProcessingElements.FiltrationProcess;
@@ -22,9 +24,11 @@ public class SSEStreamSource extends Source<Event> {
     //Hard-coded Data for ingestion that will be replaced with the payload sent through api call
     private static final String INGESTION_TOPIC = "ingested_data";
     private static final String SSE_URL         = "https://stream.wikimedia.org/v2/stream/recentchange";
+    //private static final String SSE_URL         = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open";
     private static final long   FILTERING_ID    = 1L;
     private static final long   ATTRIBUTE_ID    = 1L;
-    private static final String SOURCE_ID       = "wiki3";
+    private static final String SOURCE_ID       = "wiki";
+    //private static final String SOURCE_ID       = "nasa";
 
     private final BlockingQueue<Event>         eventQueue;
     private final EventSource                  eventSource;
@@ -32,6 +36,7 @@ public class SSEStreamSource extends Source<Event> {
     private final FiltrationProcess            filtrationProcess;
     private final AttributeSettingProcess      attributeProcess;
     private final AnonymizationProcess         anonymizationProcess;
+    private final AnonymizationMappingService anonymizationMappingService;
 
     public SSEStreamSource(KafkaProducerService kafkaProducerService) {
         this.eventQueue             = new LinkedBlockingQueue<>();
@@ -41,6 +46,7 @@ public class SSEStreamSource extends Source<Event> {
         this.filtrationProcess     = FiltrationProcess.fromFilterId(FILTERING_ID);
         this.attributeProcess      = AttributeSettingProcess.fromSettingId(ATTRIBUTE_ID);
         this.anonymizationProcess  = AnonymizationProcess.fromDataSourceId(SOURCE_ID);
+        this.anonymizationMappingService = SpringContext.getBean(AnonymizationMappingService.class);
 
         EventHandler handler = new EventHandler() {
             @Override public void onOpen() {}
@@ -55,13 +61,15 @@ public class SSEStreamSource extends Source<Event> {
             @Override
             public void onMessage(String event, MessageEvent messageEvent) throws Exception {
                 JsonNode json = mapper.readTree(messageEvent.getData());
+                //Optional: Store msg in MongoDB
+                anonymizationMappingService.saveRawData(SOURCE_ID,json);
 
                 // 1) filter
                 if (!filtrationProcess.shouldPass(json)) {
                     return;
                 }
 
-                // 2) anonymize (no DB calls here)
+                // 2) anonymize
                 json = anonymizationProcess.apply(json);
 
                 // 3) attribute setting

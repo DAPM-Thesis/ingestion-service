@@ -20,21 +20,39 @@ public class JXESConverter {
         ArrayNode eventsArray = mapper.createArrayNode();
         for (Event e : trace) {
             ObjectNode eventNode = mapper.createObjectNode();
+            // core event fields
             eventNode.put("activity", e.getActivity());
             eventNode.put("timestamp", e.getTimestamp());
+            eventNode.put("caseId", e.getCaseID());
 
+            // extract special metadata attributes to top-level of eventNode
+            for (Attribute<?> attr : e.getAttributes()) {
+                String name = attr.getName();
+                Object value = attr.getValue();
+                if ("mappingTableID".equals(name)) {
+                    eventNode.put(name, value.toString());
+                } else if ("anonymize".equals(name) && value instanceof Boolean) {
+                    eventNode.put(name, (Boolean) value);
+                } else if ("dataSourceID".equals(name)) {
+                    eventNode.put(name, value.toString());
+                }
+            }
+
+            // now build the attributes block, skipping the special ones
             ObjectNode attrNode = mapper.createObjectNode();
             for (Attribute<?> attr : e.getAttributes()) {
+                String name = attr.getName();
+                if ("mappingTableID".equals(name) || "anonymize".equals(name) || "dataSourceID".equals(name)) {
+                    continue;
+                }
                 Object value = attr.getValue();
                 String valueWithType;
-
                 if (value instanceof String) {
                     String safeString = value.toString()
-                            .replace("\"", "'")        // Replace inner quotes to avoid breaking JSON
-                            .replace("=", ":")         // Optional: sanitize equals signs
-                            .replace("\n", " ")        // Remove newlines
+                            .replace("\"", "'")
+                            .replace("=", ":")
+                            .replace("\n", " ")
                             .trim();
-
                     valueWithType = "string:" + safeString;
                 } else if (value instanceof Integer) {
                     valueWithType = "int:" + value;
@@ -43,12 +61,9 @@ public class JXESConverter {
                 } else {
                     valueWithType = "string:" + value.toString().replace("\"", "'").trim();
                 }
-
-                attrNode.put(attr.getName(), valueWithType);
+                attrNode.put(name, valueWithType);
             }
-
             eventNode.set("attributes", attrNode);
-
             eventsArray.add(eventNode);
         }
 
