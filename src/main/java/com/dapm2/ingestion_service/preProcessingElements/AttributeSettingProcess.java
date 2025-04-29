@@ -3,6 +3,7 @@ package com.dapm2.ingestion_service.preProcessingElements;
 import com.dapm2.ingestion_service.config.SpringContext;
 import com.dapm2.ingestion_service.entity.AttributeSetting;
 import com.dapm2.ingestion_service.service.StreamConfigurationService;
+import com.dapm2.ingestion_service.utils.AppConstants;
 import com.dapm2.ingestion_service.utils.TimestampConverterISO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,13 +57,18 @@ public class AttributeSettingProcess {
 
         Object rawTimestamp = extractRawValue(json, timestampField);
         String timestamp = TimestampConverterISO.toISO(rawTimestamp);
-
+        // 1) the attributes from your DB-configured list
         Set<Attribute<?>> eventAttributes = new HashSet<>();
         for (String attr : attributes) {
             String value = extractField(json, attr, "");
             eventAttributes.add(new Attribute<>(attr, value));
         }
-
+        // 2) now add mappingTableRef if present in the JSON
+        JsonNode mappingNode = json.get(AppConstants.MAPPING_Table_REFERENCE);
+        if (mappingNode != null && !mappingNode.isNull()) {
+            String mappingRef = mappingNode.asText();
+            eventAttributes.add(new Attribute<>(AppConstants.MAPPING_Table_REFERENCE, mappingRef));
+        }
         return new Event(caseId, activity, timestamp, eventAttributes);
     }
 

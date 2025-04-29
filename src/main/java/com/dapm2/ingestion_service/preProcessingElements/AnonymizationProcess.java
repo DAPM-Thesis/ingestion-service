@@ -76,7 +76,8 @@ public class AnonymizationProcess {
             // save wrapper
             mappingService.saveRawDataAnonymization(dataSourceId, wrapper);
             // tag and return
-            node.put(AppConstants.MAPPING_Table_ID, mappingId);
+            String mappingRef = AppConstants.ANONYMIZE_STATUS_TRUE + ";" +dataSourceId + ";" + mappingId;
+            node.put(AppConstants.MAPPING_Table_REFERENCE, mappingRef);
         }
         return node;
     }

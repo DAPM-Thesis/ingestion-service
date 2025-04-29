@@ -13,4 +13,7 @@ public class AppConstants {
     public static final String Mapping_Table_For_ = "mappingTableFor_";
     public static final String Ingested_Raw_Data_For_ = "ingestedRawDataFor_";
     public static final String MAPPING_Table_ID = "mappingTableID";
+    public static final String MAPPING_Table_REFERENCE = "mappingTableRef";
+    public static final boolean ANONYMIZE_STATUS_TRUE = true;
+    public static final boolean ANONYMIZE_STATUS_FALSE = false;
 }

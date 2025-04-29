@@ -63,22 +63,15 @@ public class SSEStreamSource extends Source<Event> {
                 JsonNode json = mapper.readTree(messageEvent.getData());
                 //Optional: Store msg in MongoDB
                 anonymizationMappingService.saveRawData(SOURCE_ID,json);
-
                 // 1) filter
                 if (!filtrationProcess.shouldPass(json)) {
                     return;
                 }
-
                 // 2) anonymize
                 json = anonymizationProcess.apply(json);
-
                 // 3) attribute setting
                 Event dapmEvent = attributeProcess.extractEvent(json);
-
-                // 4) to JXES + Kafka
-                String jxes = JXESUtil.toJXES(dapmEvent);
-                kafkaProducerService.sendJXES(INGESTION_TOPIC, jxes);
-
+                kafkaProducerService.sendEvent(INGESTION_TOPIC, dapmEvent);
                 // 5) enqueue
                 eventQueue.put(dapmEvent);
                 System.out.println("Ingested Value:"+ dapmEvent);
