@@ -10,14 +10,8 @@ import java.util.Map;
 public class MySink extends Sink {
 
     @Override
-    public void observe(Message message) {
-        System.out.println(this + " received: " + message);
-        try {
-            Thread.sleep(2000); // ⏸️ Pause for 2 seconds
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); // Good practice
-            System.err.println("Sink interrupted while sleeping.");
-        }
+    public void observe(Message message, int portNumber) {
+        System.out.println(this + " received: " + message + " on port " + portNumber);
     }
 
     @Override

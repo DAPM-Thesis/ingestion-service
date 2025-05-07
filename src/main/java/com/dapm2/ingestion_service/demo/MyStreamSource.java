@@ -1,79 +1,60 @@
+// src/main/java/com/dapm2/ingestion_service/demo/MyStreamSource.java
 package com.dapm2.ingestion_service.demo;
 
-import com.dapm2.ingestion_service.utils.FlattenOtherAttributeToJson;
-import com.dapm2.ingestion_service.utils.TimestampConverterISO;
+import com.dapm2.ingestion_service.config.SpringContext;
+import com.dapm2.ingestion_service.mongo.AnonymizationMappingService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.launchdarkly.eventsource.EventHandler;
 import com.launchdarkly.eventsource.EventSource;
 import com.launchdarkly.eventsource.MessageEvent;
-import communication.message.impl.event.Attribute;
-import communication.message.impl.event.Event;
-import pipeline.processingelement.Source;
 
 import java.net.URI;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
-public class MyStreamSource extends Source<Event> {
+public class MyStreamSource {
 
-    private final BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<>();
     private final EventSource eventSource;
-    private final ObjectMapper mapper = new ObjectMapper(); // Jackson parser
-    private final String sseUrl = "https://stream.wikimedia.org/v2/stream/recentchange";
-    public MyStreamSource() {
-        EventHandler handler = new EventHandler() {
-            public void onOpen() {}
-            public void onClosed() {}
-            public void onComment(String comment) {}
+    private final AnonymizationMappingService mappingService;
+    private final ObjectMapper mapper = new ObjectMapper();
 
+    /**
+     * @param url      the SSE endpoint to connect to, e.g. "https://stream.wikimedia.org/v2/stream/recentchange"
+     * @param sourceId a logical name for this feed, e.g. "MediaWikiRevisionCreate"
+     */
+    public MyStreamSource(String url, String sourceId) {
+        // grab the Mongo service from Spring
+        this.mappingService = SpringContext.getBean(AnonymizationMappingService.class);
+
+        // build a handler that writes each JSON payload into Mongo
+        EventHandler handler = new EventHandler() {
+            @Override public void onOpen()                 { /* no-op */ }
+            @Override public void onClosed()               { /* no-op */ }
+            @Override public void onComment(String comment){ /* no-op */ }
+
+            @Override
             public void onError(Throwable t) {
                 System.err.println("SSE Error: " + t.getMessage());
             }
 
-            public void onMessage(String event, MessageEvent messageEvent) throws Exception {
-                String data = messageEvent.getData();
-                JsonNode json = mapper.readTree(data);
-
-                // Extract main event fields
-                String caseId = json.path("meta").path("id").asText("unknown_case");
-                String activity = json.path("type").asText("unknown_type");
-                Object rawTimestamp = json.path("timestamp").isNumber()
-                        ? json.path("timestamp").longValue()
-                        : json.path("timestamp").asText();
-                String timestamp = TimestampConverterISO.toISO(rawTimestamp);
-
-                // Collect all other fields as flat key=value attributes
-                Set<Attribute<?>> eventAttributes = new HashSet<>();
-                FlattenOtherAttributeToJson.flatten(json, "", eventAttributes);
-
-                // Create and queue the Event
-                Event dapmEvent = new Event(caseId, activity, timestamp, eventAttributes);
-                System.out.println("Ingested Event: " + dapmEvent);
+            @Override
+            public void onMessage(String event, MessageEvent me) throws Exception {
+                JsonNode json = mapper.readTree(me.getData());
+                // Saves under collection named by sourceId
+                mappingService.saveRawData(sourceId, json);
+                System.out.println("Ingested from [" + sourceId + "]: " + json.toString());
             }
         };
 
-        this.eventSource = new EventSource.Builder(handler, URI.create(sseUrl)).build();
+        // create the EventSource client
+        this.eventSource = new EventSource.Builder(handler, URI.create(url)).build();
     }
 
-    @Override
-    public Event process() {
-        try {
-            return eventQueue.take(); // blocks until event is available
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return null;
-        }
-    }
-
-    @Override
+    /** Start the SSE client (non–blocking). */
     public void start() {
         eventSource.start();
-        super.start();
     }
 
+    /** Stop the SSE client and clean up. */
     public void stop() {
         eventSource.close();
     }

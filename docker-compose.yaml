@@ -1,43 +1,44 @@
+##Own Setup
 services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper-new-ing
-    restart: always
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    container_name: kafka-new-ing
-    restart: always
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092" # for internal communication in Docker
-      - "29092:29092" # for external communication
-
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui-ing
-    restart: always
-    depends_on:
-      - kafka
-    ports:
-      - "3000:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+#  zookeeper:
+#    image: confluentinc/cp-zookeeper:latest
+#    container_name: zookeeper-new-ing
+#    restart: always
+#    environment:
+#      ZOOKEEPER_CLIENT_PORT: 2181
+#      ZOOKEEPER_TICK_TIME: 2000
+#    ports:
+#      - "2181:2181"
+#
+#  kafka:
+#    image: confluentinc/cp-kafka:latest
+#    container_name: kafka-new-ing
+#    restart: always
+#    depends_on:
+#      - zookeeper
+#    ports:
+#      - "9092:9092" # for internal communication in Docker
+#      - "29092:29092" # for external communication
+#
+#    environment:
+#      KAFKA_BROKER_ID: 1
+#      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+#      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+#      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+#      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+#
+#  kafka-ui:
+#    image: provectuslabs/kafka-ui:latest
+#    container_name: kafka-ui-ing
+#    restart: always
+#    depends_on:
+#      - kafka
+#    ports:
+#      - "3000:8080"
+#    environment:
+#      KAFKA_CLUSTERS_0_NAME: local
+#      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+#      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
 
   postgresDB:
     image: postgres
@@ -72,3 +73,77 @@ services:
 
 volumes:
   mongo-data:
+
+
+##Implement Setup
+#networks:
+#  kafka-cluster:
+#    name: kafka-cluster
+#    external: true
+#    driver: bridge
+#services:
+#  zookeeper-5:
+#    image: confluentinc/cp-zookeeper:latest
+#    container_name: zookeeper-5
+#    restart: always
+#    networks:
+#      - kafka-cluster
+#    environment:
+#      ZOOKEEPER_CLIENT_PORT: 2181
+#      ZOOKEEPER_TICK_TIME: 2000
+#      ZOO_MY_ID: 5
+#    ports:
+#      - "5181:2181"
+#
+#  kafka-5:
+#    image: confluentinc/cp-kafka:latest
+#    container_name: kafka-5
+#    networks:
+#      - kafka-cluster
+#    restart: always
+#    depends_on:
+#      - zookeeper-5
+#    ports:
+#      - "9052:9052" # for internal communication in Docker
+#      - "29052:29052" # for external communication
+#    environment:
+#      KAFKA_BROKER_ID: 5
+#      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-5:2181
+#      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+#      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-5:9052,PLAINTEXT_HOST://localhost:29052
+#      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+#      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+#
+#  postgresDB:
+#    image: postgres
+#    container_name: postgres
+#    restart: always
+#    shm_size: 128mb
+#    environment:
+#      POSTGRES_DB: dapm_ingestion
+#      POSTGRES_USER: dapm_user
+#      POSTGRES_PASSWORD: 123456
+#    ports:
+#      - "5432:5432"
+#
+#  adminer:
+#    image: adminer
+#    container_name: adminer
+#    restart: always
+#    ports:
+#      - "8085:8080"
+#  mongo:
+#    image: mongo:6
+#    container_name: mongo
+#    restart: always
+#    environment:
+#      MONGO_INITDB_ROOT_USERNAME: dapm_user
+#      MONGO_INITDB_ROOT_PASSWORD: 123456
+#      MONGO_INITDB_DATABASE: dapm_mapping_table
+#    ports:
+#      - "27017:27017"
+#    volumes:
+#      - mongo-data:/data/db
+#
+#volumes:
+#  mongo-data:
