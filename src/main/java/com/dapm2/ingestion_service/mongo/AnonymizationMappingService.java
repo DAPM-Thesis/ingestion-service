@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static com.dapm2.ingestion_service.utils.JsonNodeUtils.getTextByPath;
+
 @Service
 public class AnonymizationMappingService {
 
@@ -57,8 +59,11 @@ public class AnonymizationMappingService {
     }
 
     public String pseudonym(String dataSourceId, String uniqueFieldName, String fieldName, JsonNode rawData) {
-        String uniqueFieldValue= rawData.get(uniqueFieldName).asText();
-        String fieldValue= rawData.get(fieldName).asText();
+        if (uniqueFieldName == null || fieldName == null) {
+            return "";
+        }
+        String uniqueFieldValue = getTextByPath(rawData, uniqueFieldName, "");
+        String fieldValue       = getTextByPath(rawData, fieldName, "");
         // 1) Check if we've already anonymized this exact value
         Optional<Document> existing = findExistingPseudonymValue(dataSourceId, uniqueFieldName, uniqueFieldValue, fieldName, fieldValue);
         if (existing.isPresent()) {

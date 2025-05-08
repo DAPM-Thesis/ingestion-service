@@ -29,42 +29,31 @@ public class StreamConfigurationService {
         setting.setCaseId(dto.getCaseId());
         setting.setActivity(dto.getActivity());
         setting.setTimeStamp(dto.getTimeStamp());
-
-        if (dto.getAttributes() != null) {
-            try {
-                setting.setStatus(dto.getStatus() != null ? dto.getStatus() : AppConstants.STATUS_ACTIVE);
-                setting.setAttributes(mapper.writeValueAsString(dto.getAttributes()));
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException("Error serializing attributes list", e);
-            }
-        }
+        setting.setStatus(dto.getStatus() != null
+                ? dto.getStatus()
+                : AppConstants.STATUS_ACTIVE);
         return repository.save(setting);
     }
-    public AttributeSetting getAttributeSettingById(Long id) {
-        return repository.findById(id)
-                .orElse(null);
-    }
-    public AttributeSetting updateAttributeSetting(Long id, AttributeSettingDTO dto) {
-        Optional<AttributeSetting> optional = repository.findById(id);
 
-        if (optional.isPresent()) {
-            AttributeSetting existing = optional.get();
+    public AttributeSetting getAttributeSettingById(Long id) {
+        return repository.findById(id).orElse(null);
+    }
+
+    /**
+     * Update only the core fields + status.
+     */
+    public AttributeSetting updateAttributeSetting(Long id, AttributeSettingDTO dto) {
+        return repository.findById(id).map(existing -> {
             existing.setCaseId(dto.getCaseId());
             existing.setActivity(dto.getActivity());
             existing.setTimeStamp(dto.getTimeStamp());
-            try {
-                existing.setAttributes(mapper.writeValueAsString(dto.getAttributes()));
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException("Error serializing attributes list", e);
-            }
             if (dto.getStatus() != null) {
                 existing.setStatus(dto.getStatus());
             }
             return repository.save(existing);
-        } else {
-            throw new RuntimeException("Attribute setting not found with id: " + id);
-        }
+        }).orElseThrow(() -> new RuntimeException("AttributeSetting not found: " + id));
     }
+
     public boolean updateAttributeStatus(Long id, String status) {
         return repository.findById(id).map(setting -> {
             setting.setStatus(status);
@@ -72,6 +61,7 @@ public class StreamConfigurationService {
             return true;
         }).orElse(false);
     }
+
     public boolean deleteAttributeSetting(Long id) {
         if (repository.existsById(id)) {
             repository.deleteById(id);

@@ -24,8 +24,6 @@ public class AttributeSetting {
     @Column(name = "time_stamp", nullable = false)
     private String timeStamp;
 
-    @Column(columnDefinition = "TEXT")
-    private String attributes;
 
     @Column(nullable = false)
     private String status = AppConstants.STATUS_ACTIVE;

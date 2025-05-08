@@ -1,5 +1,4 @@
 package com.dapm2.ingestion_service.controller;
-
 import com.dapm2.ingestion_service.dto.AnonymizationRuleDTO;
 import com.dapm2.ingestion_service.dto.StatusUpdateDTO;
 import com.dapm2.ingestion_service.entity.AnonymizationRule;

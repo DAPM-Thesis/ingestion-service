@@ -1,34 +1,37 @@
 package com.dapm2.ingestion_service.preProcessingElements.streamSources;
 
 import com.dapm2.ingestion_service.config.SpringContext;
-import com.dapm2.ingestion_service.kafka.KafkaProducerService;
 import com.dapm2.ingestion_service.mongo.AnonymizationMappingService;
 import com.dapm2.ingestion_service.preProcessingElements.AnonymizationProcess;
 import com.dapm2.ingestion_service.preProcessingElements.AttributeSettingProcess;
 import com.dapm2.ingestion_service.preProcessingElements.FiltrationProcess;
-import com.dapm2.ingestion_service.utils.JXESUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.launchdarkly.eventsource.EventHandler;
 import com.launchdarkly.eventsource.EventSource;
 import com.launchdarkly.eventsource.MessageEvent;
 import communication.message.impl.event.Event;
-import pipeline.processingelement.Source;
+import pipeline.processingelement.source.SimpleSource;
 
 import java.net.URI;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class SSEStreamSource extends Source<Event> {
+/**
+ * SSE-based source that:
+ * 1) Filters incoming JSON
+ * 2) Anonymizes sensitive fields
+ * 3) Dynamically extracts attributes into Event objects
+ *
+ * Now with error-handling around extraction so you can see exactly where
+ * NullPointerExceptions or others occur.
+ */
+public class SSEStreamSource extends SimpleSource<Event> {
 
-    //Hard-coded Data for ingestion that will be replaced with the payload sent through api call
-    private static final String INGESTION_TOPIC = "ingested_data";
-    private static final String SSE_URL         = "https://stream.wikimedia.org/v2/stream/recentchange";
-    //private static final String SSE_URL         = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open";
-    private static final long   FILTERING_ID    = 1L;
-    private static final long   ATTRIBUTE_ID    = 1L;
-    private static final String SOURCE_ID       = "wiki";
-    //private static final String SOURCE_ID       = "nasa";
+    private static final String SSE_URL      = "https://stream.wikimedia.org/v2/stream/recentchange";
+    private static final long   FILTERING_ID = 2L;
+    private static final long   ATTRIBUTE_ID = 2L;
+    private static final String SOURCE_ID    = "wiki-edit";
 
     private final BlockingQueue<Event>         eventQueue;
     private final EventSource                  eventSource;
@@ -36,17 +39,16 @@ public class SSEStreamSource extends Source<Event> {
     private final FiltrationProcess            filtrationProcess;
     private final AttributeSettingProcess      attributeProcess;
     private final AnonymizationProcess         anonymizationProcess;
-    private final AnonymizationMappingService anonymizationMappingService;
+    private final AnonymizationMappingService  anonymizationMappingService;
 
-    public SSEStreamSource(KafkaProducerService kafkaProducerService) {
-        this.eventQueue             = new LinkedBlockingQueue<>();
-        this.mapper                 = new ObjectMapper();
-
-        // load once at startup
-        this.filtrationProcess     = FiltrationProcess.fromFilterId(FILTERING_ID);
-        this.attributeProcess      = AttributeSettingProcess.fromSettingId(ATTRIBUTE_ID);
-        this.anonymizationProcess  = AnonymizationProcess.fromDataSourceId(SOURCE_ID);
-        this.anonymizationMappingService = SpringContext.getBean(AnonymizationMappingService.class);
+    public SSEStreamSource() {
+        this.eventQueue               = new LinkedBlockingQueue<>();
+        this.mapper                   = new ObjectMapper();
+        this.filtrationProcess        = FiltrationProcess.fromFilterId(FILTERING_ID);
+        this.attributeProcess         = AttributeSettingProcess.fromSettingId(ATTRIBUTE_ID);
+        this.anonymizationProcess     = AnonymizationProcess.fromDataSourceId(SOURCE_ID);
+        this.anonymizationMappingService = SpringContext
+                .getBean(AnonymizationMappingService.class);
 
         EventHandler handler = new EventHandler() {
             @Override public void onOpen() {}
@@ -55,26 +57,46 @@ public class SSEStreamSource extends Source<Event> {
 
             @Override
             public void onError(Throwable t) {
-                System.err.println("SSE Error: " + t.getMessage());
+                System.err.println("Ingestion-Service Error (SSE handler): " + t.getMessage());
+                t.printStackTrace();
             }
 
             @Override
-            public void onMessage(String event, MessageEvent messageEvent) throws Exception {
-                JsonNode json = mapper.readTree(messageEvent.getData());
-                //Optional: Store msg in MongoDB
-                anonymizationMappingService.saveRawData(SOURCE_ID,json);
-                // 1) filter
-                if (!filtrationProcess.shouldPass(json)) {
-                    return;
+            public void onMessage(String event, MessageEvent messageEvent) {
+                try {
+                    // 0) parse raw JSON
+                    JsonNode json = mapper.readTree(messageEvent.getData());
+
+                    // Optional: store raw payload for auditing
+                    anonymizationMappingService.saveRawData(SOURCE_ID, json);
+
+                    // 1) filtration
+                    if (!filtrationProcess.shouldPass(json)) {
+                        return;
+                    }
+
+                    // 2) anonymization
+                    json = anonymizationProcess.apply(json);
+
+                    // 3) attribute-setting → may throw NPE if config/path is wrong
+                    Event dapmEvent = attributeProcess.extractEvent(json);
+
+                    // 4) enqueue for downstream
+                    eventQueue.put(dapmEvent);
+                    System.out.println("Ingested Value!! ");
+
+                } catch (NullPointerException npe) {
+                    // catch the exact NPE you're seeing
+                    System.err.println("NullPointerException in onMessage(): " + npe.getMessage());
+                    System.err.println("Offending payload: " + messageEvent.getData());
+                    npe.printStackTrace();
+
+                } catch (Exception e) {
+                    // catch any other parsing/processing errors
+                    System.err.println("Error processing messageEvent: " + e.getMessage());
+                    System.err.println("Payload: " + messageEvent.getData());
+                    e.printStackTrace();
                 }
-                // 2) anonymize
-                json = anonymizationProcess.apply(json);
-                // 3) attribute setting
-                Event dapmEvent = attributeProcess.extractEvent(json);
-                kafkaProducerService.sendEvent(INGESTION_TOPIC, dapmEvent);
-                // 5) enqueue
-                eventQueue.put(dapmEvent);
-                System.out.println("Ingested Value:"+ dapmEvent);
             }
         };
 

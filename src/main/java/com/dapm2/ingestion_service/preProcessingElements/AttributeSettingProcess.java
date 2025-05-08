@@ -1,91 +1,154 @@
 package com.dapm2.ingestion_service.preProcessingElements;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import com.dapm2.ingestion_service.config.SpringContext;
 import com.dapm2.ingestion_service.entity.AttributeSetting;
 import com.dapm2.ingestion_service.service.StreamConfigurationService;
-import com.dapm2.ingestion_service.utils.AppConstants;
-import com.dapm2.ingestion_service.utils.TimestampConverterISO;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import communication.message.impl.event.Attribute;
 import communication.message.impl.event.Event;
+import com.dapm2.ingestion_service.utils.JsonNodeUtils;
+import com.dapm2.ingestion_service.utils.TimestampConverterISO;
 
-import java.util.*;
-
+/**
+ * Processes incoming JSON payloads into Event messages,
+ * dynamically extracting both flat (primitive) and nested fields.
+ */
 public class AttributeSettingProcess {
 
     private final String caseIdField;
     private final String activityField;
     private final String timestampField;
-    private final List<String> attributes;
 
-    private AttributeSettingProcess(String caseIdField, String activityField, String timestampField, List<String> attributes) {
-        this.caseIdField = caseIdField;
+    public AttributeSettingProcess(String caseIdField,
+                                   String activityField,
+                                   String timestampField) {
+        this.caseIdField   = caseIdField;
         this.activityField = activityField;
-        this.timestampField = timestampField;
-        this.attributes = attributes;
+        this.timestampField= timestampField;
     }
 
-    // Load from DB using real Spring service
+    /**
+     * Fetch the three core JSON‐paths from the DB and build a processor.
+     */
     public static AttributeSettingProcess fromSettingId(Long id) {
-        StreamConfigurationService service = SpringContext.getBean(StreamConfigurationService.class);
-        ObjectMapper mapper = SpringContext.getBean(ObjectMapper.class);
-
-        AttributeSetting setting = service.getAttributeSettingById(id);
+        StreamConfigurationService svc =
+                SpringContext.getBean(StreamConfigurationService.class);
+        AttributeSetting setting = svc.getAttributeSettingById(id);
         if (setting == null) {
-            throw new RuntimeException("No AttributeSetting found for id: " + id);
+            throw new IllegalStateException("No AttributeSetting for id " + id);
         }
-
-        List<String> attributesList = new ArrayList<>();
-        try {
-            attributesList = mapper.readValue(setting.getAttributes(), List.class);
-        } catch (Exception e) {
-            System.err.println("Failed to parse attribute list: " + e.getMessage());
-        }
-
         return new AttributeSettingProcess(
                 setting.getCaseId(),
                 setting.getActivity(),
-                setting.getTimeStamp(),
-                attributesList
+                setting.getTimeStamp()
         );
     }
 
+    /**
+     * Turn the given JSON into an Event:
+     *  1) extract caseId/activity/timestamp null-safely
+     *  2) deep-copy & remove those fields (even nested)
+     *  3) recurse the remainder into Attributes
+     */
     public Event extractEvent(JsonNode json) {
-        String caseId = extractField(json, caseIdField, "unknown_case");
-        String activity = extractField(json, activityField, "unknown_type");
+        // 1) core fields
+        String caseId   = JsonNodeUtils.getTextByPath(json, caseIdField,   "unknown_case");
+        String activity = JsonNodeUtils.getTextByPath(json, activityField, "unknown_activity");
+        String timestamp= JsonNodeUtils.getTextByPath(json, timestampField, "unknown_timestamp");
 
-        Object rawTimestamp = extractRawValue(json, timestampField);
-        String timestamp = TimestampConverterISO.toISO(rawTimestamp);
-        // 1) the attributes from your DB-configured list
-        Set<Attribute<?>> eventAttributes = new HashSet<>();
-        for (String attr : attributes) {
-            String value = extractField(json, attr, "");
-            eventAttributes.add(new Attribute<>(attr, value));
+        // 2) strip core fields from a fresh copy
+        if (!(json instanceof ObjectNode)) {
+            throw new IllegalArgumentException("Expected JSON root to be an object");
         }
-        // 2) now add mappingTableRef if present in the JSON
-        JsonNode mappingNode = json.get(AppConstants.MAPPING_Table_REFERENCE);
-        if (mappingNode != null && !mappingNode.isNull()) {
-            String mappingRef = mappingNode.asText();
-            eventAttributes.add(new Attribute<>(AppConstants.MAPPING_Table_REFERENCE, mappingRef));
-        }
-        return new Event(caseId, activity, timestamp, eventAttributes);
+        ObjectNode copy = ((ObjectNode) json).deepCopy();
+        removeByPath(copy, caseIdField);
+        removeByPath(copy, activityField);
+        removeByPath(copy, timestampField);
+
+        // 3) convert everything left into Attributes
+        Set<Attribute<?>> attrs = buildAttributes(copy);
+
+        return new Event(caseId, activity, timestamp, attrs);
     }
 
-    private String extractField(JsonNode json, String fieldPath, String defaultVal) {
-        JsonNode node = json;
-        for (String part : fieldPath.split("\\.")) {
-            node = node.path(part);
+    /**
+     * Remove a field at an arbitrary dot-path from the given ObjectNode.
+     */
+    private void removeByPath(ObjectNode root, String path) {
+        String[] parts = path.split("\\.");
+        ObjectNode parent = root;
+        for (int i = 0; i < parts.length - 1; i++) {
+            JsonNode child = parent.get(parts[i]);
+            if (!(child instanceof ObjectNode)) {
+                return; // nothing to remove
+            }
+            parent = (ObjectNode) child;
         }
-        return node.isMissingNode() ? defaultVal : node.asText();
+        parent.remove(parts[parts.length - 1]);
     }
 
-    private Object extractRawValue(JsonNode json, String fieldPath) {
-        JsonNode node = json;
-        for (String part : fieldPath.split("\\.")) {
-            node = node.path(part);
-        }
-        if (node.isMissingNode()) return null;
-        return node.isNumber() ? node.longValue() : node.asText();
+    /**
+     * Recursively walk a JSON node and collect Attributes.
+     */
+    private Set<Attribute<?>> buildAttributes(JsonNode node) {
+        Set<Attribute<?>> out = new LinkedHashSet<>();
+        node.fieldNames().forEachRemaining(name -> {
+            JsonNode child = node.get(name);
+
+            if (child.isObject()) {
+                // nested → recurse
+                Set<Attribute<?>> nested = buildAttributes(child);
+                Map<String,Attribute<?>> map = nested.stream()
+                        .collect(Collectors.toMap(Attribute::getName, Function.identity()));
+                out.add(new Attribute<>(name, null, map));
+
+            } else if (child.isArray()) {
+                // array → either list of primitives or index‐keyed nested
+                List<Object> list = new ArrayList<>();
+                Map<String,Attribute<?>> map = new LinkedHashMap<>();
+
+                for (int i = 0; i < child.size(); i++) {
+                    JsonNode el = child.get(i);
+                    if (el.isObject()) {
+                        Set<Attribute<?>> elNested = buildAttributes(el);
+                        Map<String,Attribute<?>> em = elNested.stream()
+                                .collect(Collectors.toMap(Attribute::getName, Function.identity()));
+                        map.put(String.valueOf(i), new Attribute<>(String.valueOf(i), null, em));
+                    } else {
+                        list.add(extractPrimitive(el));
+                    }
+                }
+                if (!map.isEmpty()) {
+                    out.add(new Attribute<>(name, null, map));
+                } else {
+                    out.add(new Attribute<>(name, list));
+                }
+
+            } else {
+                // primitive → linear
+                out.add(new Attribute<>(name, extractPrimitive(child)));
+            }
+        });
+        return out;
+    }
+
+    /**
+     * Convert a JSON primitive into a Java object.
+     */
+    private Object extractPrimitive(JsonNode n) {
+        if (n.isNumber())  return n.numberValue();
+        if (n.isBoolean()) return n.booleanValue();
+        return n.asText();
     }
 }
