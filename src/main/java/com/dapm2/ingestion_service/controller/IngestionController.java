@@ -1,4 +1,3 @@
-// src/main/java/com/dapm2/ingestion_service/controller/IngestionController.java
 package com.dapm2.ingestion_service.controller;
 
 import com.dapm2.ingestion_service.dto.EventDto;
@@ -40,8 +39,9 @@ public class IngestionController {
 
     @Operation(summary = "Stop Ingestion", description = "Stop Ingestion from source.")
     @PostMapping("/stop")
-    public String stopIngestion() {
-        return null;
+    public ResponseEntity<String> stopIngestion() {
+        ingestionService.stopIngestion();
+        return ResponseEntity.ok("Ingestion stopped.");
     }
 
     @Operation(summary = "Only Start Ingestion", description = "Only Ingestion from source url.")

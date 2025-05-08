@@ -1,7 +1,6 @@
 // src/main/java/com/dapm2/ingestion_service/service/IngestionService.java
 package com.dapm2.ingestion_service.service;
 
-import com.dapm2.ingestion_service.demo.MyStreamSource;
 import com.dapm2.ingestion_service.preProcessingElements.streamSources.SSEStreamSource;
 import communication.message.impl.event.Event;
 import org.springframework.stereotype.Service;
@@ -19,30 +18,58 @@ public class IngestionService {
             Executors.newSingleThreadExecutor();
     private volatile boolean running = false;
 
+    // Hold onto the SSE source so we can stop it later
+    private SSEStreamSource streamSource;
+
     public IngestionService() {
         // KafkaProducerService has been removed
     }
 
+    /**
+     * Starts the SSE ingestion stream (only once) and returns a Flux of Events.
+     */
     public synchronized Flux<Event> startIngestionFlux() {
         if (!running) {
             running = true;
+            streamSource = new SSEStreamSource();
             executor.submit(this::runStreamSource);
         }
         return sink.asFlux();
     }
 
+    /**
+     * Internal loop: pulls from the SSEStreamSource while running.
+     */
     private void runStreamSource() {
-        SSEStreamSource src = new SSEStreamSource();
-        src.start();
+        streamSource.start();
         Event e;
-        while ((e = src.process()) != null) {
+        while (running && (e = streamSource.process()) != null) {
             sink.tryEmitNext(e);
         }
     }
 
+    /**
+     * Stops the SSE ingestion: flips the running flag,
+     * closes the source, shuts down the executor, and completes the Flux.
+     */
+    public synchronized void stopIngestion() {
+        if (running) {
+            running = false;
+            if (streamSource != null) {
+                streamSource.stop();
+            }
+            executor.shutdownNow();
+            sink.tryEmitComplete();
+        }
+    }
+
+    /**
+     * A one-off ingestion from a custom URL/sourceId; retains the same pattern
+     * if you later want to extend stop() support here.
+     */
     public synchronized void onlyIngestion(String url, String sourceId) {
-        MyStreamSource src = new MyStreamSource(url, sourceId);
-        src.start();
+//        SSEStreamSource src = new SSEStreamSource(url, sourceId);
+//        src.start();
         // keep a reference if you need to call src.stop() later
     }
 }
